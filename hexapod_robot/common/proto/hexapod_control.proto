@@ -1,0 +1,6 @@
+syntax = "proto3";
+package hexapod;
+
+message Control {
+  repeated float joints = 1;
+}

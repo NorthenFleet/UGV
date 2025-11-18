@@ -1,0 +1,7 @@
+stages:
+  - name: easy
+    episodes: 1000
+  - name: medium
+    episodes: 2000
+  - name: hard
+    episodes: 3000

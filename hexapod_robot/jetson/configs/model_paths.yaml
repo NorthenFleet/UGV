@@ -1,0 +1,2 @@
+walk: models/walk/best.pth
+nav: models/nav/best.pth

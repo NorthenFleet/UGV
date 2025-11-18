@@ -1,0 +1,7 @@
+syntax = "proto3";
+package hexapod;
+
+message State {
+  repeated float joints = 1;
+  float battery = 2;
+}

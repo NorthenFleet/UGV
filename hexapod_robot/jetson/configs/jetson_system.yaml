@@ -1,0 +1,5 @@
+serial_port: /dev/ttyUSB0
+baudrate: 115200
+topics:
+  state: /hexapod/state
+  command: /hexapod/command

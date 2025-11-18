@@ -1,0 +1,3 @@
+learning_rate: 0.0003
+gamma: 0.99
+alpha: 0.2

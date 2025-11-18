@@ -1,0 +1,1 @@
+void tim_init() {}
