@@ -7,3 +7,4 @@ class HexapodClimbEnv:
 
     def step(self, action):
         return None, 0.0, False, {}
+ 

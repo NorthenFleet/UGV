@@ -30,3 +30,4 @@ class SimpleVecEnv:
                 e.close()
             except Exception:
                 pass
+ 

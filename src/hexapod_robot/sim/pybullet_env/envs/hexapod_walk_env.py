@@ -1,7 +1,7 @@
 import os
 import numpy as np
-
 from hexapod_robot.sim.pybullet_env.backend import PyBulletBackend
+from hexapod_robot.sim.ue_bridge.udp_sender import UDPSender
 
 class HexapodWalkEnv:
     def __init__(self, gui: bool = False, target_speed: float = 0.2, dt: float = 0.02, backend: str = "pybullet"):
@@ -28,6 +28,9 @@ class HexapodWalkEnv:
         self.slide_threshold = self._load_slide_threshold()
         self.prev_q_cmd = np.zeros(self.action_dim, dtype=np.float32)
         self.prev_dq_cmd = np.zeros(self.action_dim, dtype=np.float32)
+        ip = os.environ.get("UE_UDP_IP", "")
+        port = int(os.environ.get("UE_UDP_PORT", "50051"))
+        self.udp = UDPSender(ip, port, src="sim") if ip else None
 
     def reset(self, seed: int | None = None):
         obs = self.backend.reset(seed=seed)
@@ -35,6 +38,8 @@ class HexapodWalkEnv:
             self.prev_foot = self.backend.get_foot_positions(relative_to_base=True)
         else:
             self.prev_foot = np.zeros((6, 3), dtype=np.float32)
+        if self.udp:
+            self.udp.send(obs)
         return self._pack_obs(obs)
 
     def step(self, action: np.ndarray):
@@ -53,6 +58,8 @@ class HexapodWalkEnv:
         r = self._reward(obs, q_cmd, foot)
         d = self._done(obs)
         i = {}
+        if self.udp:
+            self.udp.send(obs)
         self.prev_action = act
         self.prev_q_cmd = q_cmd
         self.prev_dq_cmd = dq_cmd
@@ -64,6 +71,11 @@ class HexapodWalkEnv:
             self.backend.disconnect()
         except Exception:
             pass
+        if self.udp:
+            try:
+                self.udp.close()
+            except Exception:
+                pass
 
     def _pack_obs(self, obs: dict) -> np.ndarray:
         base_ori = obs["base_ori"]
@@ -150,3 +162,4 @@ class HexapodWalkEnv:
             return float(data.get("slide_threshold", 0.002))
         except Exception:
             return 0.002
+ 
