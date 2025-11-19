@@ -2,7 +2,7 @@ import os
 import numpy as np
 import torch
 
-from hexapod_robot.sim.pybullet_env.envs.hexapod_walk_env import HexapodWalkEnv
+from sim.pybullet_env.envs.hexapod_walk_env import HexapodWalkEnv
 from hexapod_robot.rl.policies.actor_critic import ActorCritic
 
 def run_episode(env, agent, max_steps=1000):

@@ -48,7 +48,13 @@ class PyBulletBackend(ISimBackend):
         self.plane = p.loadURDF("plane.urdf", physicsClientId=self.cid)
         if not os.path.isfile(urdf_path):
             raise FileNotFoundError(urdf_path)
-        self.robot = p.loadURDF(urdf_path, [0, 0, 0.2], physicsClientId=self.cid)
+        ext = os.path.splitext(urdf_path)[1].lower()
+        if ext == ".urdf":
+            self.robot = p.loadURDF(urdf_path, [0, 0, 0.2], physicsClientId=self.cid)
+        elif ext in (".stl", ".obj"):
+            self._load_mesh_model(urdf_path)
+        else:
+            self.robot = p.loadURDF(urdf_path, [0, 0, 0.2], physicsClientId=self.cid)
         self._apply_sim_params()
         self.joint_indices = []
         for i in range(p.getNumJoints(self.robot, physicsClientId=self.cid)):
@@ -163,4 +169,12 @@ class PyBulletBackend(ISimBackend):
                 self.p.disconnect(self.cid)
             except Exception:
                 pass
+
+    def _load_mesh_model(self, mesh_path: str, scale: float = 1.0, mass: float = 10.0):
+        p = self.p
+        vs = p.createVisualShape(shapeType=p.GEOM_MESH, fileName=mesh_path, meshScale=[scale, scale, scale], physicsClientId=self.cid)
+        cs = p.createCollisionShape(shapeType=p.GEOM_MESH, fileName=mesh_path, meshScale=[scale, scale, scale], physicsClientId=self.cid)
+        self.robot = p.createMultiBody(baseMass=mass, baseCollisionShapeIndex=cs, baseVisualShapeIndex=vs, basePosition=[0, 0, 0.2], physicsClientId=self.cid)
+        self.joint_indices = []
+        self.foot_links = []
  

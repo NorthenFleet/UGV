@@ -7,8 +7,8 @@ try:
 except Exception:
     SummaryWriter = None
 
-from hexapod_robot.sim.pybullet_env.envs.hexapod_walk_env import HexapodWalkEnv
-from hexapod_robot.sim.pybullet_env.envs.vec_env import SimpleVecEnv
+from sim.pybullet_env.envs.hexapod_walk_env import HexapodWalkEnv
+from sim.pybullet_env.envs.vec_env import SimpleVecEnv
 from hexapod_robot.rl.policies.actor_critic import ActorCritic
 from hexapod_robot.rl.algorithms.ppo_agent import PPOAgent
 
