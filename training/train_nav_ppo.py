@@ -1,5 +1,5 @@
 def main():
-    pass
+    print("train nav ppo placeholder")
 
 if __name__ == "__main__":
     main()

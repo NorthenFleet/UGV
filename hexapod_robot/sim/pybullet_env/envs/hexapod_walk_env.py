@@ -4,17 +4,25 @@ import numpy as np
 from hexapod_robot.sim.pybullet_env.backend import PyBulletBackend
 
 class HexapodWalkEnv:
-    def __init__(self, gui: bool = False, target_speed: float = 0.2, dt: float = 0.02):
+    def __init__(self, gui: bool = False, target_speed: float = 0.2, dt: float = 0.02, backend: str = "pybullet"):
         self.dt = dt
-        self.backend = PyBulletBackend()
-        self.urdf = os.path.join(os.path.dirname(__file__), "../assets/urdf/hexapod.urdf")
-        self.backend.load_model(self.urdf, gui=gui)
-        self.action_dim = len(self.backend.joint_indices)
+        if backend == "pybullet":
+            self.backend = PyBulletBackend()
+            self.urdf = os.path.join(os.path.dirname(__file__), "../assets/urdf/hexapod.urdf")
+            self.backend.load_model(self.urdf, gui=gui)
+        elif backend == "ue":
+            from hexapod_robot.sim.ue_backend import UEBackend
+            self.backend = UEBackend()
+            self.backend.load_model("ue", gui=gui)
+        else:
+            raise ValueError("unknown backend")
+        self.action_dim = len(getattr(self.backend, "joint_indices", list(range(18))))
         self.prev_action = np.zeros(self.action_dim, dtype=np.float32)
         self.target_speed = target_speed
         self.max_tilt = np.deg2rad(15)
         self.q_min, self.q_max = self._load_joint_limits()
-        self.backend.set_friction(0.8)
+        if hasattr(self.backend, "set_friction"):
+            self.backend.set_friction(0.8)
         self.max_joint_speed = self._load_max_joint_speed()
         self.max_joint_accel = self._load_max_joint_accel()
         self.slide_threshold = self._load_slide_threshold()
@@ -23,7 +31,10 @@ class HexapodWalkEnv:
 
     def reset(self, seed: int | None = None):
         obs = self.backend.reset(seed=seed)
-        self.prev_foot = self.backend.get_foot_positions(relative_to_base=True)
+        if hasattr(self.backend, "get_foot_positions"):
+            self.prev_foot = self.backend.get_foot_positions(relative_to_base=True)
+        else:
+            self.prev_foot = np.zeros((6, 3), dtype=np.float32)
         return self._pack_obs(obs)
 
     def step(self, action: np.ndarray):
@@ -37,7 +48,7 @@ class HexapodWalkEnv:
         dq_cmd = np.clip(dq_cmd, -self.max_joint_speed, self.max_joint_speed)
         q_cmd = self.prev_q_cmd + dq_cmd * self.dt
         obs = self.backend.step(q_cmd, dt=self.dt)
-        foot = self.backend.get_foot_positions(relative_to_base=True)
+        foot = self.backend.get_foot_positions(relative_to_base=True) if hasattr(self.backend, "get_foot_positions") else np.zeros((6, 3), dtype=np.float32)
         o = self._pack_obs(obs)
         r = self._reward(obs, q_cmd, foot)
         d = self._done(obs)
@@ -61,7 +72,7 @@ class HexapodWalkEnv:
         q = obs["q"]
         dq = obs["dq"]
         contacts = obs["contacts"]
-        foot = self.backend.get_foot_positions(relative_to_base=True).reshape(-1)
+        foot = self.backend.get_foot_positions(relative_to_base=True).reshape(-1) if hasattr(self.backend, "get_foot_positions") else np.zeros(18, dtype=np.float32)
         return np.concatenate([base_ori, lin_vel, ang_vel, q, dq, contacts, foot], axis=0).astype(np.float32)
 
     def _reward(self, obs: dict, q_cmd: np.ndarray, foot: np.ndarray) -> float:

@@ -54,16 +54,19 @@ def rollout(env, agent, steps=1024):
 
 def main():
     n_env = int(os.environ.get("HEXAPOD_N_ENV", "1"))
+    backend = os.environ.get("HEXAPOD_BACKEND", "pybullet")
     if n_env > 1:
-        env = SimpleVecEnv(lambda: HexapodWalkEnv(gui=False, dt=0.02), n_env)
+        env = SimpleVecEnv(lambda: HexapodWalkEnv(gui=False, dt=0.02, backend=backend), n_env)
     else:
-        env = HexapodWalkEnv(gui=False, dt=0.02)
+        env = HexapodWalkEnv(gui=False, dt=0.02, backend=backend)
     obs = env.reset()
     obs_dim = obs.shape[0]
     act_dim = env.action_dim
     model = ActorCritic(obs_dim, act_dim)
     agent = PPOAgent(model)
-    log_path = os.path.join(os.path.dirname(__file__), "../logs/training_metrics.csv")
+    logs_dir = os.path.join(os.path.dirname(__file__), "logs")
+    os.makedirs(logs_dir, exist_ok=True)
+    log_path = os.path.join(logs_dir, "training_metrics.csv")
     best = None
     writer = SummaryWriter(os.path.join(os.path.dirname(__file__), "../logs/tensorboard")) if SummaryWriter else None
     for it in range(10):
@@ -79,7 +82,7 @@ def main():
             writer.add_scalar("train/policy_loss", stats["policy_loss"], it)
             writer.add_scalar("train/value_loss", stats["value_loss"], it)
             writer.add_scalar("train/entropy", stats["entropy"], it)
-        ckpt_dir = os.path.join(os.path.dirname(__file__), "../checkpoints/walk")
+        ckpt_dir = os.path.join(os.path.dirname(__file__), "checkpoints/walk")
         os.makedirs(ckpt_dir, exist_ok=True)
         path_latest = os.path.join(ckpt_dir, "ckpt_latest.pt")
         torch.save(agent.model.state_dict(), path_latest)

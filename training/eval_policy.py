@@ -32,7 +32,7 @@ def main():
             v = model.value(o_t)
         return a.cpu().numpy(), None, v.cpu().numpy()
     agent.act = act_fn
-    ckpt_dir = os.path.join(os.path.dirname(__file__), "../checkpoints/walk")
+    ckpt_dir = os.path.join(os.path.dirname(__file__), "checkpoints/walk")
     best = os.path.join(ckpt_dir, "best.pt")
     latest = os.path.join(ckpt_dir, "ckpt_latest.pt")
     path = best if os.path.isfile(best) else latest
