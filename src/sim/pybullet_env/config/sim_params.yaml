@@ -1,0 +1,9 @@
+gravity: -9.81
+time_step: 0.002
+friction: 0.8
+max_joint_speed: 4.0
+max_joint_accel: 50.0
+friction_range:
+  - 0.6
+  - 1.2
+slide_threshold: 0.002

@@ -1,0 +1,2 @@
+hexapod_walk: sim.pybullet_env.envs.hexapod_walk_env:HexapodWalkEnv
+hexapod_climb: sim.pybullet_env.envs.hexapod_climb_env:HexapodClimbEnv
