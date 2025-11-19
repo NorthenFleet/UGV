@@ -9,6 +9,7 @@ def main():
         obs, r, d, i = env.step(a)
         if d:
             break
+    env.close()
 
 if __name__ == "__main__":
     main()
