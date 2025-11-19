@@ -56,3 +56,4 @@ hexapod_robot/ros2_ws/install/
 # Misc
 .env
 *.log
+*.stl
