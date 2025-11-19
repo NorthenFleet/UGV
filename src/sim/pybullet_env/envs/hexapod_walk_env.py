@@ -8,15 +8,17 @@ class HexapodWalkEnv:
         self.dt = dt
         if backend == "pybullet":
             self.backend = PyBulletBackend()
-            self.urdf = os.path.join(os.path.dirname(__file__), "../assets/urdf/hexapod.urdf")
-            self.backend.load_model(self.urdf, gui=gui)
+            default_model = os.path.join(os.path.dirname(__file__), "../assets/urdf/hexapod.urdf")
+            model_path = os.environ.get("HEXAPOD_MODEL", default_model)
+            self.backend.load_model(model_path, gui=gui)
         elif backend == "ue":
             from sim.ue_backend import UEBackend
             self.backend = UEBackend()
             self.backend.load_model("ue", gui=gui)
         else:
             raise ValueError("unknown backend")
-        self.action_dim = len(getattr(self.backend, "joint_indices", list(range(18))))
+        ji = getattr(self.backend, "joint_indices", [])
+        self.action_dim = len(ji) if len(ji) > 0 else 18
         self.prev_action = np.zeros(self.action_dim, dtype=np.float32)
         self.target_speed = target_speed
         self.max_tilt = np.deg2rad(15)
@@ -94,7 +96,7 @@ class HexapodWalkEnv:
         tilt = abs(e[0]) + abs(e[1])
         r_ori = -tilt
         r_smooth = -np.mean((q_cmd - self._q_from_action(self.prev_action)) ** 2)
-        r_energy = -np.mean(np.abs(obs["dq"]))
+        r_energy = -np.mean(np.abs(obs["dq"])) if np.size(obs.get("dq", [])) > 0 else 0.0
         slide = np.linalg.norm((foot - self.prev_foot), axis=1)
         slide_mask = obs["contacts"][: len(slide)]
         slide_excess = np.maximum(0.0, slide - self.slide_threshold)
