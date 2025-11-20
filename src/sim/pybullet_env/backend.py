@@ -101,8 +101,11 @@ class PyBulletBackend(ISimBackend):
         dq = np.array(dq, dtype=np.float32)
         contacts = np.zeros(6, dtype=np.float32)
         for i, link_idx in enumerate(self.foot_links[:6]):
-            pts = self.p.getContactPoints(self.robot, self.plane, linkIndexA=link_idx, physicsClientId=self.cid)
-            contacts[i] = 1.0 if len(pts) > 0 else 0.0
+            pts = self.p.getContactPoints(bodyA=self.robot, bodyB=self.plane, linkIndexA=link_idx, physicsClientId=self.cid)
+            if isinstance(pts, (list, tuple)):
+                contacts[i] = 1.0 if len(pts) > 0 else 0.0
+            else:
+                contacts[i] = 0.0
         euler = np.array(self.p.getEulerFromQuaternion(base_ori), dtype=np.float32)
         return {
             "base_pos": np.array(base_pos, dtype=np.float32),
