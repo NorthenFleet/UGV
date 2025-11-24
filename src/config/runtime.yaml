@@ -1,0 +1,25 @@
+backend: pybullet
+gui: true
+steps: 1000
+dt: 0.02
+target_speed: 0.2
+gait_freq_hz: 1.5
+ckpt: ""
+model: "src/sim/pybullet_env/assets/urdf/hexapod.urdf"
+ue_udp:
+  ip: ""
+  port: 50051
+mesh:
+  scale: 1.0
+  mass: 10.0
+  pos: [0.0, 0.0, 0.2]
+  rpy: [0.0, 0.0, 0.0]
+  collision: box
+  box_size: [0.35, 0.25, 0.08]
+run_forever: true
+real_time: true
+camera:
+  auto: true
+  distance: 0
+  yaw: 50
+  pitch: -35

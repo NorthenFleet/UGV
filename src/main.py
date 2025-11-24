@@ -1,5 +1,7 @@
 import os
 import argparse
+import yaml
+import time
 import numpy as np
 
 def _try_load_rl(obs_dim: int, act_dim: int, ckpt: str | None):
@@ -46,38 +48,110 @@ class TripodAgent:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--backend", type=str, default=os.environ.get("HEXAPOD_BACKEND", "pybullet"))
-    parser.add_argument("--gui", type=int, default=int(os.environ.get("HEXAPOD_GUI", "1")))
-    parser.add_argument("--steps", type=int, default=int(os.environ.get("HEXAPOD_STEPS", "2000")))
-    parser.add_argument("--freq", type=float, default=float(os.environ.get("HEXAPOD_GAIT_FREQ", "1.5")))
-    parser.add_argument("--ckpt", type=str, default=os.environ.get("HEXAPOD_CKPT", ""))
-    parser.add_argument("--model", type=str, default=os.environ.get("HEXAPOD_MODEL", ""))
-    parser.add_argument("--ue_ip", type=str, default=os.environ.get("UE_UDP_IP", ""))
-    parser.add_argument("--ue_port", type=int, default=int(os.environ.get("UE_UDP_PORT", "50051")))
+    parser.add_argument("--config", type=str, default=os.path.join("src", "config", "runtime.yaml"))
     args = parser.parse_args()
 
-    if args.model:
-        os.environ["HEXAPOD_MODEL"] = args.model
-    if args.ue_ip:
-        os.environ["UE_UDP_IP"] = args.ue_ip
-        os.environ["UE_UDP_PORT"] = str(args.ue_port)
+    cfg_path = args.config
+    if not os.path.isfile(cfg_path):
+        cfg = {}
+    else:
+        with open(cfg_path, "r") as f:
+            cfg = yaml.safe_load(f) or {}
+
+    backend = str(cfg.get("backend", "pybullet"))
+    gui = bool(cfg.get("gui", True))
+    steps = int(cfg.get("steps", 2000))
+    dt = float(cfg.get("dt", 0.02))
+    target_speed = float(cfg.get("target_speed", 0.2))
+    freq = float(cfg.get("gait_freq_hz", 1.5))
+    ckpt = str(cfg.get("ckpt", ""))
+    model = str(cfg.get("model", ""))
+    ue = cfg.get("ue_udp", {}) or {}
+    mesh = cfg.get("mesh", {}) or {}
+    run_forever = bool(cfg.get("run_forever", False))
+    real_time = bool(cfg.get("real_time", True if gui else False))
+    cam = cfg.get("camera", {}) or {}
+
+    if model:
+        os.environ["HEXAPOD_MODEL"] = model
+    ip = str(ue.get("ip", ""))
+    port = int(ue.get("port", 50051))
+    if ip:
+        os.environ["UE_UDP_IP"] = ip
+        os.environ["UE_UDP_PORT"] = str(port)
+    if "scale" in mesh:
+        os.environ["HEXAPOD_MESH_SCALE"] = str(mesh.get("scale"))
+    if "mass" in mesh:
+        os.environ["HEXAPOD_MESH_MASS"] = str(mesh.get("mass"))
+    if "pos" in mesh and isinstance(mesh.get("pos"), (list, tuple)):
+        os.environ["HEXAPOD_MESH_POS"] = ",".join(str(float(x)) for x in mesh.get("pos"))
+    if "rpy" in mesh and isinstance(mesh.get("rpy"), (list, tuple)):
+        os.environ["HEXAPOD_MESH_RPY"] = ",".join(str(float(x)) for x in mesh.get("rpy"))
+    if "collision" in mesh:
+        os.environ["HEXAPOD_MESH_COLLISION"] = str(mesh.get("collision"))
+    if "box_size" in mesh and isinstance(mesh.get("box_size"), (list, tuple)):
+        os.environ["HEXAPOD_MESH_BOX_SIZE"] = ",".join(str(float(x)) for x in mesh.get("box_size"))
+    if "auto" in cam:
+        os.environ["HEXAPOD_CAM_AUTO"] = "1" if cam.get("auto") else "0"
+    if "distance" in cam:
+        os.environ["HEXAPOD_CAM_DISTANCE"] = str(cam.get("distance"))
+    if "yaw" in cam:
+        os.environ["HEXAPOD_CAM_YAW"] = str(cam.get("yaw"))
+    if "pitch" in cam:
+        os.environ["HEXAPOD_CAM_PITCH"] = str(cam.get("pitch"))
+    os.environ["HEXAPOD_AABB_WIREFRAME"] = "1"
 
     from sim.pybullet_env.envs.hexapod_walk_env import HexapodWalkEnv
-    env = HexapodWalkEnv(gui=bool(args.gui), dt=0.02, backend=args.backend)
+    env = HexapodWalkEnv(gui=gui, dt=dt, backend=backend)
+    env.target_speed = target_speed
     obs = env.reset()
     obs_dim = obs.shape[0]
     act_dim = env.action_dim
-    rl_agent = _try_load_rl(obs_dim, act_dim, args.ckpt)
-    gait_agent = TripodAgent(act_dim, freq_hz=args.freq)
-    for _ in range(args.steps):
-        if rl_agent is not None:
-            a, _, _ = rl_agent.act(obs)
+    rl_agent = _try_load_rl(obs_dim, act_dim, ckpt)
+    gait_agent = TripodAgent(act_dim, freq_hz=freq)
+    try:
+        print("loaded_model", os.environ.get("HEXAPOD_MODEL", ""))
+        bi = getattr(env.backend, "joint_indices", [])
+        print("backend_info", {"joints": len(bi), "robot_id": getattr(env.backend, "robot", None)})
+        dbg = getattr(env.backend, "get_debug_info", lambda: {})()
+        print("debug_info", dbg)
+    except Exception:
+        pass
+    try:
+        if run_forever:
+            while True:
+                if rl_agent is not None:
+                    a, _, _ = rl_agent.act(obs)
+                else:
+                    a = gait_agent.act(obs)
+                obs, r, d, i = env.step(a)
+                try:
+                    print("step", {"vx": float(obs[4])})
+                except Exception:
+                    pass
+                if d:
+                    obs = env.reset()
+                if real_time:
+                    time.sleep(dt)
         else:
-            a = gait_agent.act(obs)
-        obs, r, d, i = env.step(a)
-        if d:
-            obs = env.reset()
-    env.close()
+            for _ in range(steps):
+                if rl_agent is not None:
+                    a, _, _ = rl_agent.act(obs)
+                else:
+                    a = gait_agent.act(obs)
+                obs, r, d, i = env.step(a)
+                try:
+                    print("step", {"vx": float(obs[4])})
+                except Exception:
+                    pass
+                if d:
+                    obs = env.reset()
+                if real_time:
+                    time.sleep(dt)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        env.close()
 
 if __name__ == "__main__":
     main()

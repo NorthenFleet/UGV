@@ -34,6 +34,57 @@ class PyBulletBackend(ISimBackend):
         self.friction = 0.8
         self.friction_range = None
 
+    def _auto_camera(self):
+        try:
+            d = float(os.environ.get("HEXAPOD_CAM_DISTANCE", "0"))
+            yaw = float(os.environ.get("HEXAPOD_CAM_YAW", "50"))
+            pitch = float(os.environ.get("HEXAPOD_CAM_PITCH", "-35"))
+            base_pos = self.p.getBasePositionAndOrientation(self.robot, physicsClientId=self.cid)[0]
+            if d <= 0.0:
+                try:
+                    aabb = self.p.getAABB(self.robot, -1, physicsClientId=self.cid)
+                    size = [abs(aabb[1][i] - aabb[0][i]) for i in range(3)]
+                    r = max(size) if max(size) > 1e-6 else 0.5
+                    d = 2.0 * r
+                except Exception:
+                    d = 1.2
+            self.p.resetDebugVisualizerCamera(d, yaw, pitch, base_pos, physicsClientId=self.cid)
+        except Exception:
+            pass
+
+    def _add_debug_marker(self):
+        try:
+            b = self.p.getBasePositionAndOrientation(self.robot, physicsClientId=self.cid)[0]
+            L = 0.3
+            self.p.addUserDebugLine([b[0]-L, b[1], b[2]], [b[0]+L, b[1], b[2]], [1,0,0], lineWidth=3, lifeTime=0, physicsClientId=self.cid)
+            self.p.addUserDebugLine([b[0], b[1]-L, b[2]], [b[0], b[1]+L, b[2]], [0,1,0], lineWidth=3, lifeTime=0, physicsClientId=self.cid)
+            self.p.addUserDebugLine([b[0], b[1], b[2]-L], [b[0], b[1], b[2]+L], [0,0,1], lineWidth=3, lifeTime=0, physicsClientId=self.cid)
+        except Exception:
+            pass
+
+    def _draw_aabb_wireframe(self):
+        try:
+            aabb = self.p.getAABB(self.robot, -1, physicsClientId=self.cid)
+            lo = aabb[0]
+            hi = aabb[1]
+            corners = [
+                [lo[0], lo[1], lo[2]], [hi[0], lo[1], lo[2]],
+                [hi[0], hi[1], lo[2]], [lo[0], hi[1], lo[2]],
+                [lo[0], lo[1], hi[2]], [hi[0], lo[1], hi[2]],
+                [hi[0], hi[1], hi[2]], [lo[0], hi[1], hi[2]],
+            ]
+            edges = [
+                (0,1),(1,2),(2,3),(3,0),
+                (4,5),(5,6),(6,7),(7,4),
+                (0,4),(1,5),(2,6),(3,7)
+            ]
+            for e in edges:
+                a = corners[e[0]]
+                b = corners[e[1]]
+                self.p.addUserDebugLine(a,b,[1,1,0], lineWidth=2, lifeTime=0, physicsClientId=self.cid)
+        except Exception:
+            pass
+
     def load_model(self, urdf_path: str, gui: bool = False):
         try:
             import pybullet as p
@@ -78,6 +129,12 @@ class PyBulletBackend(ISimBackend):
             self.set_friction(f)
         else:
             self._apply_sim_params()
+        if os.environ.get("HEXAPOD_CAM_AUTO", "1") != "0":
+            self._auto_camera()
+        if os.environ.get("HEXAPOD_MARKER", "1") != "0":
+            self._add_debug_marker()
+        if os.environ.get("HEXAPOD_AABB_WIREFRAME", "0") == "1":
+            self._draw_aabb_wireframe()
         return self.get_obs()
 
     def step(self, action: np.ndarray, dt: float):
@@ -166,6 +223,17 @@ class PyBulletBackend(ISimBackend):
             vals.append(self.p.getJointState(self.robot, j, physicsClientId=self.cid)[0])
         return np.array(vals, dtype=np.float32)
 
+    def get_debug_info(self) -> dict:
+        try:
+            vs = self.p.getVisualShapeData(self.robot, physicsClientId=self.cid)
+        except Exception:
+            vs = []
+        try:
+            aabb = self.p.getAABB(self.robot, -1, physicsClientId=self.cid)
+        except Exception:
+            aabb = None
+        return {"num_visual": len(vs) if isinstance(vs, (list, tuple)) else 0, "aabb": aabb}
+
     def disconnect(self):
         if self.p is not None and self.cid is not None:
             try:
@@ -175,8 +243,64 @@ class PyBulletBackend(ISimBackend):
 
     def _load_mesh_model(self, mesh_path: str, scale: float = 1.0, mass: float = 10.0):
         p = self.p
+        # allow env overrides without changing public API
+        try:
+            s_env = os.environ.get("HEXAPOD_MESH_SCALE", None)
+            if s_env:
+                s_val = float(s_env)
+                if s_val > 0:
+                    scale = s_val
+        except Exception:
+            pass
+        try:
+            m_env = os.environ.get("HEXAPOD_MESH_MASS", None)
+            if m_env:
+                m_val = float(m_env)
+                if m_val > 0:
+                    mass = m_val
+        except Exception:
+            pass
+        # base pose overrides
+        base_pos = [0, 0, 0.2]
+        base_ori = p.getQuaternionFromEuler([0, 0, 0])
+        try:
+            pos_env = os.environ.get("HEXAPOD_MESH_POS", None)
+            if pos_env:
+                parts = [float(x) for x in pos_env.split(",")]
+                if len(parts) == 3:
+                    base_pos = parts
+        except Exception:
+            pass
+        try:
+            rpy_env = os.environ.get("HEXAPOD_MESH_RPY", None)
+            if rpy_env:
+                parts = [float(x) for x in rpy_env.split(",")]
+                if len(parts) == 3:
+                    base_ori = p.getQuaternionFromEuler(parts)
+        except Exception:
+            pass
         vs = p.createVisualShape(shapeType=p.GEOM_MESH, fileName=mesh_path, meshScale=[scale, scale, scale], physicsClientId=self.cid)
-        cs = p.createCollisionShape(shapeType=p.GEOM_MESH, fileName=mesh_path, meshScale=[scale, scale, scale], physicsClientId=self.cid)
-        self.robot = p.createMultiBody(baseMass=mass, baseCollisionShapeIndex=cs, baseVisualShapeIndex=vs, basePosition=[0, 0, 0.2], physicsClientId=self.cid)
+        coll_mode = os.environ.get("HEXAPOD_MESH_COLLISION", "none").strip().lower()
+        cs = -1
+        if coll_mode == "mesh":
+            try:
+                cs = p.createCollisionShape(shapeType=p.GEOM_MESH, fileName=mesh_path, meshScale=[scale, scale, scale], flags=p.GEOM_FORCE_CONCAVE_TRIMESH, physicsClientId=self.cid)
+                mass = 0.0
+            except Exception:
+                cs = -1
+        elif coll_mode == "box":
+            try:
+                bs_env = os.environ.get("HEXAPOD_MESH_BOX_SIZE", None)
+                if bs_env:
+                    parts = [float(x) for x in bs_env.split(",")]
+                    if len(parts) == 3:
+                        half = [parts[0] * 0.5, parts[1] * 0.5, parts[2] * 0.5]
+                        cs = p.createCollisionShape(shapeType=p.GEOM_BOX, halfExtents=half, physicsClientId=self.cid)
+                if cs == -1:
+                    cs = p.createCollisionShape(shapeType=p.GEOM_BOX, halfExtents=[0.175, 0.125, 0.04], physicsClientId=self.cid)
+            except Exception:
+                cs = -1
+        self.robot = p.createMultiBody(baseMass=mass, baseCollisionShapeIndex=cs, baseVisualShapeIndex=vs, basePosition=base_pos, baseOrientation=base_ori, physicsClientId=self.cid)
+        # mesh model is single rigid body → no joints
         self.joint_indices = []
         self.foot_links = []
