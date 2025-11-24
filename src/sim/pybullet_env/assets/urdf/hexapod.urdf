@@ -1,47 +1,63 @@
-  <!-- ================= 左前腿：spider 风格 ================= -->
-  <!-- Coxa：从机身侧面水平伸出去的一段 -->
+<?xml version="1.0"?>
+<robot name="hexapod">
+  <link name="base">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="6.0"/>
+      <inertia ixx="0.02" ixy="0" ixz="0" iyy="0.02" iyz="0" izz="0.02"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.35 0.25 0.08"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.35 0.25 0.08"/>
+      </geometry>
+    </collision>
+  </link>
+
   <link name="LF_coxa_link">
     <inertial>
       <mass value="0.25"/>
       <inertia ixx="8e-4" iyy="8e-4" izz="8e-4"/>
     </inertial>
     <visual>
-      <!-- 圆柱沿 X 轴，水平伸出 -->
-      <origin xyz="0.045 0 0" rpy="0 0 0"/>
+      <origin xyz="0.045 0 0" rpy="0 1.5708 0"/>
       <geometry>
-        <cylinder length="0.09" radius="0.01"/>
+        <cylinder length="0.09" radius="0.02"/>
       </geometry>
     </visual>
     <collision>
-      <origin xyz="0.045 0 0" rpy="0 0 0"/>
+      <origin xyz="0.045 0 0" rpy="0 1.5708 0"/>
       <geometry>
-        <cylinder length="0.09" radius="0.01"/>
+        <cylinder length="0.09" radius="0.02"/>
       </geometry>
     </collision>
   </link>
 
-  <!-- Femur：大腿，向下伸一段 -->
   <link name="LF_femur_link">
     <inertial>
       <mass value="0.20"/>
       <inertia ixx="6e-4" iyy="6e-4" izz="6e-4"/>
     </inertial>
     <visual>
-      <!-- 圆柱沿 Z 轴向下 -->
       <origin xyz="0 0 -0.06" rpy="0 0 0"/>
       <geometry>
-        <cylinder length="0.12" radius="0.01"/>
+        <cylinder length="0.12" radius="0.02"/>
       </geometry>
     </visual>
     <collision>
       <origin xyz="0 0 -0.06" rpy="0 0 0"/>
       <geometry>
-        <cylinder length="0.12" radius="0.01"/>
+        <cylinder length="0.12" radius="0.02"/>
       </geometry>
     </collision>
   </link>
 
-  <!-- Tibia：小腿，再向下伸一段 -->
   <link name="LF_tibia_link">
     <inertial>
       <mass value="0.18"/>
@@ -50,38 +66,33 @@
     <visual>
       <origin xyz="0 0 -0.08" rpy="0 0 0"/>
       <geometry>
-        <cylinder length="0.16" radius="0.01"/>
+        <cylinder length="0.16" radius="0.02"/>
       </geometry>
     </visual>
     <collision>
       <origin xyz="0 0 -0.08" rpy="0 0 0"/>
       <geometry>
-        <cylinder length="0.16" radius="0.01"/>
+        <cylinder length="0.16" radius="0.02"/>
       </geometry>
     </collision>
   </link>
 
-  <!-- Coxa 关节：绕 Z 轴旋转，控制整条腿往前/往后摆 -->
   <joint name="LF_COXA" type="revolute">
     <parent link="base"/>
     <child  link="LF_coxa_link"/>
-    <!-- 关节在机身边缘偏上的位置，可以适当调 y、z 让腿更外张 -->
-    <origin xyz="0.17 0.14 0.01" rpy="0 0 0"/>
+    <origin xyz="0.17 0.14 0.02" rpy="0 0 0"/>
     <axis xyz="0 0 1"/>
     <limit lower="-1.5" upper="1.5" effort="5" velocity="4.0"/>
   </joint>
 
-  <!-- Femur 关节：绕 Y 轴旋转，控制大腿抬/落 -->
   <joint name="LF_FEMUR" type="revolute">
     <parent link="LF_coxa_link"/>
     <child  link="LF_femur_link"/>
-    <!-- 使用 coxa 中点作为铰接位置 -->
     <origin xyz="0.09 0 0" rpy="0 0 0"/>
     <axis xyz="0 1 0"/>
     <limit lower="-1.5" upper="0.7" effort="5" velocity="4.0"/>
   </joint>
 
-  <!-- Tibia 关节：绕 Y 轴旋转，控制小腿弯曲 -->
   <joint name="LF_TIBIA" type="revolute">
     <parent link="LF_femur_link"/>
     <child  link="LF_tibia_link"/>
@@ -89,3 +100,5 @@
     <axis xyz="0 1 0"/>
     <limit lower="-1.5" upper="0.5" effort="5" velocity="4.0"/>
   </joint>
+
+</robot>

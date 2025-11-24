@@ -121,14 +121,17 @@ class HexapodWalkEnv:
             import yaml
             with open(path, "r") as f:
                 data = yaml.safe_load(f)
-            hip = data.get("hip", {})
-            knee = data.get("knee", {})
-            ankle = data.get("ankle", {})
+            hip = data.get("hip", {}) or data.get("coxa", {}) or {}
+            knee = data.get("knee", {}) or data.get("femur", {}) or {}
+            ankle = data.get("ankle", {}) or data.get("tibia", {}) or {}
+            group_min = [float(hip.get("min", -1.0)), float(knee.get("min", -1.5)), float(ankle.get("min", -1.0))]
+            group_max = [float(hip.get("max", 1.0)), float(knee.get("max", 1.5)), float(ankle.get("max", 1.0))]
             mins = []
             maxs = []
-            for _ in range(6):
-                mins.extend([hip.get("min", -1.0), knee.get("min", -1.5), ankle.get("min", -1.0)])
-                maxs.extend([hip.get("max", 1.0), knee.get("max", 1.5), ankle.get("max", 1.0)])
+            for i in range(self.action_dim):
+                idx = i % 3
+                mins.append(group_min[idx])
+                maxs.append(group_max[idx])
             return np.array(mins, dtype=np.float32), np.array(maxs, dtype=np.float32)
         except Exception:
             mins = -np.ones(self.action_dim, dtype=np.float32)
